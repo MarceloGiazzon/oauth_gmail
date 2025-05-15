@@ -88,6 +88,7 @@
     <div class="container">
         <h1>Gmail API Authorization</h1>
         <form id="authForm">
+            <span>V01</span>
             <div>
                 <label for="clientId">Client ID:</label>
                 <input type="text" id="clientId" name="clientId" required>
@@ -114,7 +115,7 @@
             // This MUST be one of the Authorized redirect URIs configured in your Google Cloud Console project.
             // For local testing, it might be 'http://localhost:PORT/authorizationCallback.html'
             // or 'http://127.0.0.1:PORT/authorizationCallback.html'
-            const callbackURL = 'http://localhost:8000/authorizationCallback.html'; // <<<< CHANGE THIS
+            const callbackURL = 'https://marcelogiazzon.github.io/oauth_gmail/Gemini_OAuth_CallbackRequest.html'; // <<<< CHANGE THIS
 
             if (!clientId) {
                 alert('Please enter a Client ID.');
