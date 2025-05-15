@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail OAuth Authorization Request</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            text-align: left;
+        }
+        input[type="text"], input[type="password"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4285F4;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #357ae8;
+        }
+        .note {
+            font-size: 0.9em;
+            color: #777;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyBLgebJv2UdssTdUBAwroxyg7zdheIQPV4",
+    authDomain: "oauth-f6724.firebaseapp.com",
+    projectId: "oauth-f6724",
+    storageBucket: "oauth-f6724.firebasestorage.app",
+    messagingSenderId: "632080057996",
+    appId: "1:632080057996:web:dbea4e7e7af9691bf81da9",
+    measurementId: "G-3116KRRVM6"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
+
+<body>
+    <div class="container">
+        <h1>Gmail API Authorization</h1>
+        <form id="authForm">
+            <div>
+                <label for="clientId">Client ID:</label>
+                <input type="text" id="clientId" name="clientId" required>
+            </div>
+            <div>
+                <label for="clientSecret">Client Secret:</label>
+                <input type="password" id="clientSecret" name="clientSecret" required>
+                <p class="note">The Client Secret is collected but NOT sent in this initial authorization redirect. It's typically used server-side for token exchange.</p>
+            </div>
+            <button type="submit">Authorize with Google</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('authForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            // These variables will hold your OAuth credentials
+            const clientId = document.getElementById('clientId').value;
+            const clientSecret = document.getElementById('clientSecret').value; // Stored, but not used in this redirect
+
+            // --- IMPORTANT ---
+            // Replace with the actual URL where your authorizationCallback.html is hosted.
+            // This MUST be one of the Authorized redirect URIs configured in your Google Cloud Console project.
+            // For local testing, it might be 'http://localhost:PORT/authorizationCallback.html'
+            // or 'http://127.0.0.1:PORT/authorizationCallback.html'
+            const callbackURL = 'http://localhost:8000/authorizationCallback.html'; // <<<< CHANGE THIS
+
+            if (!clientId) {
+                alert('Please enter a Client ID.');
+                return;
+            }
+            // Client Secret is not directly validated here for the authorization request URL
+
+            // OAuth 2.0 Scopes for Gmail API (send and receive/modify)
+            // You can adjust scopes as needed.
+            // https://developers.google.com/gmail/api/auth/scopes
+            const scopes = [
+                'https://www.googleapis.com/auth/gmail.modify' // Read, compose, send, and modify all messages (except permanent delete)
+                // Or use more granular scopes:
+                // 'https://www.googleapis.com/auth/gmail.send',
+                // 'https://www.googleapis.com/auth/gmail.readonly'
+            ];
+            const scopeString = scopes.join(' ');
+
+            // Google's OAuth 2.0 endpoint for authorization
+            const oauth2Endpoint = 'https://accounts.google.com/o/oauth2/v2/auth';
+
+            // Create a random string for the state parameter (for CSRF protection)
+            const state = 'xyz' + Math.random().toString(36).substring(2, 15);
+            // In a real app, you should store this state (e.g., in localStorage or a cookie)
+            // and verify it on the callback page.
+            localStorage.setItem('oauth_state', state);
+
+
+            // Construct the authorization URL
+            const params = new URLSearchParams({
+                client_id: clientId,
+                redirect_uri: callbackURL,
+                response_type: 'code', // We are requesting an authorization code
+                scope: scopeString,
+                access_type: 'offline', // Request a refresh token for offline access (optional)
+                prompt: 'consent',      // Force the consent screen every time (optional, good for testing)
+                state: state            // CSRF protection
+            });
+
+            const authorizationUrl = `${oauth2Endpoint}?${params.toString()}`;
+
+            // Output to console for debugging (optional)
+            console.log('Client ID:', clientId);
+            console.log('Client Secret (stored, not sent in redirect):', clientSecret);
+            console.log('Callback URL:', callbackURL);
+            console.log('Authorization URL:', authorizationUrl);
+
+            // Redirect the user to Google's authorization server
+            window.location.href = authorizationUrl;
+        });
+    </script>
+</body>
+</html>

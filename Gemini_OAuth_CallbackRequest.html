@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Callback</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+        }
+        pre {
+            background-color: #eee;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-analytics.js";
+      // TODO: Add SDKs for Firebase products that you want to use
+      // https://firebase.google.com/docs/web/setup#available-libraries
+
+      // Your web app's Firebase configuration
+      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+      const firebaseConfig = {
+        apiKey: "AIzaSyBLgebJv2UdssTdUBAwroxyg7zdheIQPV4",
+        authDomain: "oauth-f6724.firebaseapp.com",
+        projectId: "oauth-f6724",
+        storageBucket: "oauth-f6724.firebasestorage.app",
+        messagingSenderId: "632080057996",
+        appId: "1:632080057996:web:dbea4e7e7af9691bf81da9",
+        measurementId: "G-3116KRRVM6"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+    </script>
+    <div class="container">
+        <h2>Authorization Callback</h2>
+        <p>Received data from Google OAuth:</p>
+        <pre id="callbackData"></pre>
+        <p>Check the browser console for more details (Ctrl+Shift+J or Cmd+Opt+J).</p>
+    </div>
+
+    <script>
+        function displayData(data) {
+            const dataElement = document.getElementById('callbackData');
+            if (dataElement) {
+                dataElement.textContent = JSON.stringify(data, null, 2);
+            }
+        }
+
+        window.onload = function() {
+            console.log('Callback page loaded.');
+            const params = new URLSearchParams(window.location.search);
+            const receivedData = {};
+
+            // Retrieve stored state
+            const storedState = sessionStorage.getItem('oauth_state');
+            sessionStorage.removeItem('oauth_state'); // Clean up state
+
+            // Get parameters from URL
+            const code = params.get('code');
+            const receivedState = params.get('state');
+            const error = params.get('error');
+            const scope = params.get('scope'); // Google often returns the granted scopes
+
+            console.log('URL Parameters:', params.toString());
+
+            if (error) {
+                receivedData.error = error;
+                receivedData.error_description = params.get('error_description') || 'No description provided.';
+                console.error('OAuth Error:', error);
+                console.error('Error Description:', receivedData.error_description);
+            } else {
+                // Verify state parameter
+                if (!storedState) {
+                    receivedData.error = 'State missing';
+                    receivedData.error_description = 'No state found in session storage. CSRF attack may be possible.';
+                    console.error(receivedData.error_description);
+                } else if (storedState !== receivedState) {
+                    receivedData.error = 'State mismatch';
+                    receivedData.error_description = 'Received state does not match stored state. CSRF attack detected.';
+                    console.error(receivedData.error_description);
+                    console.log('Stored state:', storedState);
+                    console.log('Received state:', receivedState);
+                } else {
+                    console.log('State check passed.');
+                }
+
+                if (code) {
+                    receivedData.authorization_code = code;
+                    console.log('Authorization Code:', code);
+                } else if (!error) { // if no code and no error, something is unexpected
+                     receivedData.warning = 'No authorization code received and no error reported.';
+                     console.warn(receivedData.warning)
+                }
+
+                if (scope) {
+                    receivedData.granted_scopes = scope.split(' ');
+                    console.log('Granted Scopes:', receivedData.granted_scopes);
+                }
+                 if (receivedState) { // always log received state for debugging
+                    receivedData.received_state = receivedState;
+                }
+            }
+
+            displayData(receivedData);
+
+            // IMPORTANT NEXT STEP (not implemented here as per request):
+            // The authorization_code an_code would now be sent to your server-side application.
+            // The server would then exchange this code (along with client_id and client_secret)
+            // for an access_token and a refresh_token with Google's token endpoint:
+            // POST https://oauth2.googleapis.com/token
+            // This step MUST happen on the server to protect your client_secret.
+            console.log('Next step: Send the authorization_code to your backend server to exchange it for an access token.');
+        };
+    </script>
+</body>
+</html>
