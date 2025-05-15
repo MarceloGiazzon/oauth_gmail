@@ -54,7 +54,7 @@
       const analytics = getAnalytics(app);
     </script>
     <div class="container">
-        <h2>Authorization Callback</h2>
+        <h2>Authorization Callback - V2</h2>
         <p>Received data from Google OAuth:</p>
         <pre id="callbackData"></pre>
         <p>Check the browser console for more details (Ctrl+Shift+J or Cmd+Opt+J).</p>
@@ -74,7 +74,7 @@
             const receivedData = {};
 
             // Retrieve stored state
-            const storedState = sessionStorage.getItem('oauth_state');
+            const storedState = localStorage.getItem('oauth_state');
             sessionStorage.removeItem('oauth_state'); // Clean up state
 
             // Get parameters from URL
