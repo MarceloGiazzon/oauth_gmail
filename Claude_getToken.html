@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get OAuth Token</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 550px;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 10px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .description {
+            color: #5f6368;
+            margin-bottom: 25px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #3c4043;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        textarea:focus {
+            border-color: #1a73e8;
+            outline: none;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #0d66da;
+        }
+
+        button:disabled {
+            background-color: #dadce0;
+            cursor: not-allowed;
+        }
+
+        .result-container {
+            margin-top: 25px;
+            display: none;
+        }
+
+        .result-container.show {
+            display: block;
+        }
+
+        .result-header {
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: #3c4043;
+        }
+
+        .result-area {
+            background-color: #f8f9fa;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .token-value {
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .copy-btn {
+            background-color: #34a853;
+            width: auto;
+            font-size: 14px;
+            padding: 8px 16px;
+            margin-bottom: 15px;
+        }
+
+        .copy-btn:hover {
+            background-color: #2d9249;
+        }
+
+        .error {
+            color: #d93025;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loader {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google OAuth Token Generator</h1>
+        <p class="description">Enter your OAuth credentials and authorization code to retrieve an access token</p>
+        
+        <div class="form-group">
+            <label for="clientId">Client ID</label>
+            <input type="text" id="clientId" placeholder="Enter your OAuth client ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="clientSecret">Client Secret</label>
+            <input type="password" id="clientSecret" placeholder="Enter your OAuth client secret">
+        </div>
+        
+        <div class="form-group">
+            <label for="authCode">Authorization Code</label>
+            <textarea id="authCode" placeholder="Enter the authorization code received after OAuth flow"></textarea>
+        </div>
+        
+        <button id="getTokenBtn" onclick="getAccessToken()">
+            <span class="loader" id="loader"><span class="spinner"></span></span>
+            Get Access Token
+        </button>
+        
+        <div class="result-container" id="resultContainer">
+            <p class="result-header">Access Token:</p>
+            <div class="result-area">
+                <code class="token-value" id="accessToken"></code>
+            </div>
+            <button class="copy-btn" onclick="copyToClipboard('accessToken')">Copy Access Token</button>
+            
+            <p class="result-header">Refresh Token:</p>
+            <div class="result-area">
+                <code class="token-value" id="refreshToken"></code>
+            </div>
+            <button class="copy-btn" onclick="copyToClipboard('refreshToken')">Copy Refresh Token</button>
+            
+            <p class="result-header">Complete Response:</p>
+            <div class="result-area">
+                <pre id="fullResponse"></pre>
+            </div>
+            <button class="copy-btn" onclick="copyToClipboard('fullResponse')">Copy Full Response</button>
+        </div>
+        
+        <div id="errorMessage" class="error"></div>
+    </div>
+
+    <script>
+        function getAccessToken() {
+            // Get input values
+            const clientId = document.getElementById('clientId').value.trim();
+            const clientSecret = document.getElementById('clientSecret').value.trim();
+            const authCode = document.getElementById('authCode').value.trim();
+            const errorMsg = document.getElementById('errorMessage');
+            const loader = document.getElementById('loader');
+            const getTokenBtn = document.getElementById('getTokenBtn');
+            
+            // Clear previous error messages
+            errorMsg.textContent = '';
+            
+            // Validate inputs
+            if (!clientId) {
+                errorMsg.textContent = 'Client ID is required';
+                return;
+            }
+            
+            if (!clientSecret) {
+                errorMsg.textContent = 'Client Secret is required';
+                return;
+            }
+            
+            if (!authCode) {
+                errorMsg.textContent = 'Authorization Code is required';
+                return;
+            }
+            
+            // Show loading state
+            loader.style.display = 'inline-block';
+            getTokenBtn.disabled = true;
+            
+            // Prepare request to Google's token endpoint
+            const tokenEndpoint = 'https://oauth2.googleapis.com/token';
+            const redirectUri = 'https://marcelogiazzon.github.io/oauth_gmail/Gemini_OAuth_CallbackRequest.html'; // Commonly used for testing
+            
+            const formData = new URLSearchParams();
+            formData.append('client_id', clientId);
+            formData.append('client_secret', clientSecret);
+            formData.append('code', authCode);
+            formData.append('redirect_uri', redirectUri);
+            formData.append('grant_type', 'authorization_code');
+            
+            // Make the request
+            fetch(tokenEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Display results
+                document.getElementById('accessToken').textContent = data.access_token || 'Not provided';
+                document.getElementById('refreshToken').textContent = data.refresh_token || 'Not provided';
+                document.getElementById('fullResponse').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('resultContainer').classList.add('show');
+                
+                // Save to localStorage for convenience
+                try {
+                    localStorage.setItem('oauth_access_token', data.access_token);
+                    localStorage.setItem('oauth_refresh_token', data.refresh_token);
+                } catch (e) {
+                    console.error('Could not save to localStorage:', e);
+                }
+            })
+            .catch(error => {
+                console.error('Error retrieving token:', error);
+                errorMsg.textContent = `Error: ${error.message}. Make sure your credentials and authorization code are correct and not expired.`;
+            })
+            .finally(() => {
+                // Hide loading state
+                loader.style.display = 'none';
+                getTokenBtn.disabled = false;
+            });
+        }
+        
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    // Create and show a temporary notification
+                    const button = event.target;
+                    const originalText = button.textContent;
+                    button.textContent = 'Copied!';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+        }
+        
+        // Additional helper function to extract query parameters (in case the auth code is in the URL)
+        function getQueryParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            
+            if (code) {
+                document.getElementById('authCode').value = code;
+            }
+        }
+        
+        // Check for URL params on page load
+        window.onload = getQueryParams;
+    </script>
+</body>
+</html>

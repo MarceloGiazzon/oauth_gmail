@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get User Email Address</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #357ae8;
+        }
+        #emailDisplay {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a73e8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Get User Email Address</h1>
+        <form id="emailForm">
+            <div class="form-group">
+                <label for="clientId">Client ID:</label>
+                <input type="text" id="clientId" name="clientId" placeholder="Enter your Client ID">
+            </div>
+            <div class="form-group">
+                <label for="clientSecret">Client Secret:</label>
+                <input type="text" id="clientSecret" name="clientSecret" placeholder="Enter your Client Secret">
+            </div>
+            <div class="form-group">
+                <label for="authorizationCode">Authorization Code:</label>
+                <input type="text" id="authorizationCode" name="authorizationCode" placeholder="Enter the Authorization Code">
+            </div>
+            <button type="button" id="getEmailButton">Get Email Address</button>
+        </form>
+        <div id="emailDisplay"></div>
+    </div>
+
+    <script>
+        const getEmailButton = document.getElementById('getEmailButton');
+        const emailDisplay = document.getElementById('emailDisplay');
+        const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+        const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
+
+        getEmailButton.addEventListener('click', async () => {
+            const clientId = document.getElementById('clientId').value.trim();
+            const clientSecret = document.getElementById('clientSecret').value.trim();
+            const authorizationCode = document.getElementById('authorizationCode').value.trim();
+
+            if (!clientId || !clientSecret || !authorizationCode) {
+                alert('Please enter Client ID, Client Secret, and Authorization Code.');
+                return;
+            }
+
+            try {
+                // 1. Exchange Authorization Code for Access Token
+                const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        code: authorizationCode,
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        redirect_uri: 'https://marcelogiazzon.github.io/oauth_gmail/Gemini_OAuth_CallbackRequest.html',  // Important: Use 'postmessage' for this client-side flow
+                        grant_type: 'authorization_code'
+                    })
+                });
+
+                if (!tokenResponse.ok) {
+                    const errorData = await tokenResponse.json();
+                    console.error('Error exchanging code for token:', errorData);
+                    emailDisplay.textContent = `Error: ${errorData.error_description || 'Failed to get access token.'}`;
+                    return;
+                }
+
+                const tokenData = await tokenResponse.json();
+                const accessToken = tokenData.access_token;
+
+                // 2. Use Access Token to get User Info (including email)
+                const userInfoResponse = await fetch(GOOGLE_USERINFO_URL, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (!userInfoResponse.ok) {
+                    const errorData = await userInfoResponse.json();
+                    console.error('Error getting user info:', errorData);
+                    emailDisplay.textContent = `Error: ${errorData.error || 'Failed to get user info.'}`;
+                    return;
+                }
+                const userInfoData = await userInfoResponse.json();
+                const email = userInfoData.email;
+                emailDisplay.textContent = `Email Address: ${email}`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                emailDisplay.textContent = `Error: ${error.message || 'An unexpected error occurred.'}`;
+            }
+        });
+    </script>
+</body>
+</html>
