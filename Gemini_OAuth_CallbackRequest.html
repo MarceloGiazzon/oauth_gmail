@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OAuth Authorization Callback V04</title>
+    <title>OAuth Authorization Callback V05</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
@@ -61,6 +61,12 @@
         <div class="spinner"></div>
         <p id="statusMessage" class="mt-4 text-gray-600">Waiting for authorization code...</p>
         <div id="resultMessageBox" class="message-box hidden"></div>
+        <div id="userInfoDisplay" class="mt-4 text-left text-gray-700 hidden">
+            <h2 class="text-xl font-semibold mb-2">User Information:</h2>
+            <p><strong>Name:</strong> <span id="userName"></span></p>
+            <p><strong>Email:</strong> <span id="userEmail"></span></p>
+            <p><strong>Picture:</strong> <img id="userPicture" class="inline-block h-12 w-12 rounded-full ml-2" alt="User Picture" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" onerror="this.onerror=null;this.src='https://placehold.co/48x48/CCCCCC/FFFFFF?text=No+Pic';"></p>
+        </div>
     </div>
 
     <script>
@@ -70,6 +76,10 @@
 
         const statusMessageElement = document.getElementById('statusMessage');
         const resultMessageBox = document.getElementById('resultMessageBox');
+        const userInfoDisplay = document.getElementById('userInfoDisplay');
+        const userNameElement = document.getElementById('userName');
+        const userEmailElement = document.getElementById('userEmail');
+        const userPictureElement = document.getElementById('userPicture');
 
         function displayMessage(message, type) {
             resultMessageBox.textContent = message;
@@ -77,6 +87,48 @@
             resultMessageBox.classList.remove('hidden');
             statusMessageElement.textContent = ''; // Clear status message once a final result is shown
             document.querySelector('.spinner').style.display = 'none'; // Hide spinner
+        }
+
+        function displayUserInfo(userInfo) {
+            if (userInfo) {
+                userNameElement.textContent = userInfo.name || 'N/A';
+                userEmailElement.textContent = userInfo.email || 'N/A';
+                if (userInfo.picture) {
+                    userPictureElement.src = userInfo.picture;
+                } else {
+                    userPictureElement.src = 'https://placehold.co/48x48/CCCCCC/FFFFFF?text=No+Pic'; // Placeholder if no picture
+                }
+                userInfoDisplay.classList.remove('hidden');
+            }
+        }
+
+        async function fetchUserInfo(accessToken) {
+            statusMessageElement.textContent = 'Fetching user information...';
+            try {
+                const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (!userInfoResponse.ok) {
+                    const errorData = await userInfoResponse.json();
+                    console.error('Error fetching user info:', errorData);
+                    displayMessage(`Failed to get user info: ${errorData.error_description || errorData.error}`, 'error');
+                    return null;
+                }
+
+                const userInfo = await userInfoResponse.json();
+                console.log('User Information:', userInfo);
+                displayUserInfo(userInfo);
+                statusMessageElement.textContent = 'User information obtained!';
+                return userInfo;
+
+            } catch (error) {
+                console.error('Network or other error during user info fetch:', error);
+                displayMessage('A network error occurred while fetching user info. Check console for details.', 'error');
+                return null;
+            }
         }
 
         async function handleAuthorizationCallback() {
@@ -138,19 +190,21 @@
 
                 const tokenData = await tokenResponse.json();
                 console.log('Access Token Data:', tokenData);
-                statusMessageElement.textContent = 'Access token obtained! Preparing to send demo email...';
-
                 const accessToken = tokenData.access_token;
-                const expiresIn = tokenData.expires_in;
-                // Optionally, save refreshToken if 'access_type': 'offline' was used in auth request
-                // const refreshToken = tokenData.refresh_token;
 
-                displayMessage('Access token successfully obtained! Attempting to send demo email in 3 seconds...', 'success');
+                // --- NEW STEP: Get User Information ---
+                statusMessageElement.textContent = 'Access token obtained. Fetching user information...';
+                const userInfo = await fetchUserInfo(accessToken);
 
-                // Wait for 3 seconds before attempting to send email
-                setTimeout(async () => {
-                    await sendDemoEmail(accessToken);
-                }, 3000);
+                if (userInfo) {
+                    displayMessage('Access token and user info successfully obtained! Attempting to send demo email in 3 seconds...', 'success');
+                    // Wait for 3 seconds before attempting to send email
+                    setTimeout(async () => {
+                        await sendDemoEmail(accessToken);
+                    }, 3000);
+                } else {
+                    displayMessage('Access token obtained, but failed to fetch user info. Email will not be sent.', 'error');
+                }
 
             } catch (error) {
                 console.error('Network or other error during token exchange:', error);
