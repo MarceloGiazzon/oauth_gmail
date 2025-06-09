@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OAuth Authorization Callback V03</title>
+    <title>OAuth Authorization Callback V04</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
@@ -102,7 +102,7 @@
             // Retrieve client ID and client Secret from localStorage
             const clientId = localStorage.getItem('google_oauth_clientId');
             const clientSecret = localStorage.getItem('google_oauth_clientSecret');
-            const callbackURL = window.location.origin + '/authorizationCallback.html'; // Must match registered redirect URI
+            const callbackURL = 'https://marcelogiazzon.github.io/oauth_gmail/Gemini_OAuth_CallbackRequest.html'; // Must match registered redirect URI
 
             if (!clientId || !clientSecret) {
                 displayMessage('Error: Client ID or Client Secret not found in localStorage. Please go back to authorizationRequest.html and enter them.', 'error');
