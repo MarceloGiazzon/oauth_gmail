@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive OAuth Authorization Callback V05</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 32rem;
+        }
+        .message-box {
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+        }
+        .message-box.success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .message-box.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4285f4;
+            animation: spin 1s ease infinite;
+            margin: 0 auto;
+        }
+        .file-info {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            text-align: left;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Processing Drive Authorization...</h1>
+        <div class="spinner" id="spinner"></div>
+        <p id="statusMessage" class="mt-4 text-gray-600">Initializing...</p>
+        <div id="resultMessageBox" class="message-box success" style="display: none;"></div>
+        <div id="userInfoDisplay" class="mt-4 text-left text-gray-700" style="display: none;">
+            <h2 class="text-xl font-semibold mb-2">User Information:</h2>
+            <p><strong>Name:</strong> <span id="userName"></span></p>
+            <p><strong>Email:</strong> <span id="userEmail"></span></p>
+            <p><strong>Picture:</strong> <img id="userPicture" class="inline-block h-12 w-12 rounded-full ml-2" alt="User Picture" onerror="this.onerror=null;this.src='https://placehold.co/48x48/CCCCCC/FFFFFF?text=No+Pic';"></p>
+        </div>
+        <div id="fileInfoDisplay" class="file-info" style="display: none;">
+            <h3 class="text-lg font-semibold mb-2">Created File:</h3>
+            <p><strong>Name:</strong> <span id="fileName"></span></p>
+            <p><strong>File ID:</strong> <span id="fileId"></span></p>
+            <p><strong>Link:</strong> <a id="fileLink" href="#" target="_blank" class="text-blue-600 hover:text-blue-800 underline">Open in Google Drive</a></p>
+        </div>
+    </div>
+
+    <script>
+        const statusMessageElement = document.getElementById('statusMessage');
+        const resultMessageBox = document.getElementById('resultMessageBox');
+        const userInfoDisplay = document.getElementById('userInfoDisplay');
+        const fileInfoDisplay = document.getElementById('fileInfoDisplay');
+        const spinner = document.getElementById('spinner');
+        const userNameElement = document.getElementById('userName');
+        const userEmailElement = document.getElementById('userEmail');
+        const userPictureElement = document.getElementById('userPicture');
+        const fileNameElement = document.getElementById('fileName');
+        const fileIdElement = document.getElementById('fileId');
+        const fileLinkElement = document.getElementById('fileLink');
+
+        function displayMessage(message, type) {
+            resultMessageBox.textContent = message;
+            resultMessageBox.className = `message-box ${type}`;
+            resultMessageBox.style.display = 'block';
+            statusMessageElement.textContent = '';
+            spinner.style.display = 'none';
+        }
+
+        function displayUserInfo(userInfo) {
+            if (userInfo) {
+                userNameElement.textContent = userInfo.name || 'N/A';
+                userEmailElement.textContent = userInfo.email || 'N/A';
+                if (userInfo.picture) {
+                    userPictureElement.src = userInfo.picture;
+                }
+                userInfoDisplay.style.display = 'block';
+            }
+        }
+
+        function displayFileInfo(fileData) {
+            if (fileData) {
+                fileNameElement.textContent = fileData.name || 'N/A';
+                fileIdElement.textContent = fileData.id || 'N/A';
+                fileLinkElement.href = `https://drive.google.com/file/d/${fileData.id}/view`;
+                fileInfoDisplay.style.display = 'block';
+            }
+        }
+
+        async function fetchUserInfo(accessToken) {
+            statusMessageElement.textContent = 'Fetching user information...';
+            try {
+                const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (!userInfoResponse.ok) {
+                    const errorData = await userInfoResponse.json();
+                    console.error('Error fetching user info:', errorData);
+                    displayMessage(`Failed to get user info: ${errorData.error_description || errorData.error}`, 'error');
+                    return null;
+                }
+
+                const userInfo = await userInfoResponse.json();
+                console.log('User Information:', userInfo);
+                displayUserInfo(userInfo);
+                return userInfo;
+
+            } catch (error) {
+                console.error('Network or other error during user info fetch:', error);
+                displayMessage('A network error occurred while fetching user info. Check console for details.', 'error');
+                return null;
+            }
+        }
+
+        async function createDriveDocument(accessToken) {
+            statusMessageElement.textContent = 'Creating Google Drive document...';
+            
+            const fileName = 'prueba_gdrive_oauth.txt';
+            const fileContent = 'prueba gdrive by webpage with oauth';
+
+            try {
+                // Step 1: Create file metadata
+                const metadata = {
+                    name: fileName,
+                    parents: [] // Will be created in root folder
+                };
+
+                // Step 2: Create the file with content using multipart upload
+                const boundary = '-------314159265358979323846';
+                const delimiter = "\r\n--" + boundary + "\r\n";
+                const close_delim = "\r\n--" + boundary + "--";
+
+                const requestBody = 
+                    delimiter +
+                    'Content-Type: application/json\r\n\r\n' +
+                    JSON.stringify(metadata) +
+                    delimiter +
+                    'Content-Type: text/plain\r\n\r\n' +
+                    fileContent +
+                    close_delim;
+
+                const createResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': `multipart/related; boundary="${boundary}"`
+                    },
+                    body: requestBody
+                });
+
+                if (!createResponse.ok) {
+                    const errorData = await createResponse.json();
+                    console.error('Error creating Drive document:', errorData);
+                    displayMessage(`Failed to create document: ${errorData.error?.message || 'Unknown error'}`, 'error');
+                    return;
+                }
+
+                const fileData = await createResponse.json();
+                console.log('Drive Document Created Successfully:', fileData);
+                
+                displayFileInfo(fileData);
+                displayMessage('Google Drive document created successfully!', 'success');
+
+            } catch (error) {
+                console.error('Network or other error during document creation:', error);
+                displayMessage('A network error occurred while creating the document. Check console for details.', 'error');
+            }
+        }
+
+        async function handleAuthorizationCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const authCode = urlParams.get('code');
+            const error = urlParams.get('error');
+
+            if (error) {
+                console.error('OAuth Error:', error);
+                displayMessage(`Authorization failed: ${error}`, 'error');
+                return;
+            }
+
+            if (!authCode) {
+                console.warn('No authorization code found in URL.');
+                displayMessage('No authorization code received. Please try again.', 'error');
+                return;
+            }
+
+            console.log('Received Authorization Code:', authCode);
+            statusMessageElement.textContent = 'Authorization code received. Exchanging for access token...';
+
+            // Retrieve credentials from storage
+            let clientId, clientSecret;
+            
+            // Try to get from window variable first (artifact storage)
+            if (window.googleDriveCredentials) {
+                clientId = window.googleDriveCredentials.clientId;
+                clientSecret = window.googleDriveCredentials.clientSecret;
+            }
+            
+            // Fallback to check other storage methods
+            if (!clientId || !clientSecret) {
+                // Check if there are any stored credentials
+                displayMessage('Error: Client credentials not found. Please go back and enter them again.', 'error');
+                console.error('Missing Google Client ID or Secret.');
+                return;
+            }
+
+            const callbackURL = 'https://marcelogiazzon.github.io/oauth_gmail/Drive_OAuth_CallbackRequest.html';
+
+            try {
+                const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        code: authCode,
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        redirect_uri: callbackURL,
+                        grant_type: 'authorization_code',
+                    }).toString(),
+                });
+
+                if (!tokenResponse.ok) {
+                    const errorData = await tokenResponse.json();
+                    console.error('Error exchanging code for token:', errorData);
+                    displayMessage(`Failed to get access token: ${errorData.error_description || errorData.error}`, 'error');
+                    return;
+                }
+
+                const tokenData = await tokenResponse.json();
+                console.log('Access Token Data:', tokenData);
+                const accessToken = tokenData.access_token;
+
+                statusMessageElement.textContent = 'Access token obtained. Fetching user information...';
+                const userInfo = await fetchUserInfo(accessToken);
+
+                if (userInfo) {
+                    displayMessage('Access token and user info successfully obtained! Creating Drive document in 2 seconds...', 'success');
+                    setTimeout(async () => {
+                        await createDriveDocument(accessToken);
+                    }, 2000);
+                } else {
+                    displayMessage('Access token obtained, but failed to fetch user info. Document creation will proceed anyway.', 'error');
+                    setTimeout(async () => {
+                        await createDriveDocument(accessToken);
+                    }, 2000);
+                }
+
+            } catch (error) {
+                console.error('Network or other error during token exchange:', error);
+                displayMessage('A network error occurred during token exchange. Check console for details.', 'error');
+            }
+        }
+
+        // Call the main function when the script loads
+        handleAuthorizationCallback();
+    </script>
+</body>
+</html>
