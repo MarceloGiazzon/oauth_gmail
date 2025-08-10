@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="emotion-insertion-point" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Authorization Callback for Google Drive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 32rem;
+        }
+        .message-box {
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+        }
+        .message-box.success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .message-box.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4c8bf5;
+            animation: spin 1s ease infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Processing Authorization...</h1>
+        <div class="spinner"></div>
+        <p id="statusMessage" class="mt-4 text-gray-600"></p>
+        <div id="resultMessageBox" class="message-box hidden"></div>
+    </div>
+
+    <script>
+        // *** IMPORTANT: For security, clientSecret should NEVER be used directly in client-side code in a real application.
+        // It must be handled by a secure backend server to prevent exposure.
+        // This example is for demonstration purposes ONLY and will likely fail due to security constraints. ***
+
+        const statusMessageElement = document.getElementById('statusMessage');
+        const resultMessageBox = document.getElementById('resultMessageBox');
+        const spinnerElement = document.querySelector('.spinner');
+
+        function displayMessage(message, type) {
+            resultMessageBox.textContent = message;
+            resultMessageBox.className = `message-box ${type}`;
+            resultMessageBox.classList.remove('hidden');
+            statusMessageElement.textContent = ''; // Clear status message once a final result is shown
+            spinnerElement.style.display = 'none'; // Hide spinner
+        }
+
+        async function createDriveFile(accessToken) {
+            statusMessageElement.textContent = 'Creating Google Drive file...';
+            const fileName = 'OAuth Test Document';
+            const fileContent = 'prueba gdrive by webpage with oauth';
+            const mimeType = 'text/plain';
+
+            // We use the multipart upload endpoint to create a file and its content in a single request.
+            const boundary = 'foo_bar_baz';
+            const metadata = {
+                name: fileName,
+                mimeType: mimeType,
+            };
+
+            const body = `--${boundary}\n`
+                + `Content-Type: application/json; charset=UTF-8\n\n`
+                + `${JSON.stringify(metadata)}\n\n`
+                + `--${boundary}\n`
+                + `Content-Type: ${mimeType}\n\n`
+                + `${fileContent}\n\n`
+                + `--${boundary}--`;
+
+            try {
+                const driveResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': `multipart/related; boundary="${boundary}"`
+                    },
+                    body: body
+                });
+
+                if (!driveResponse.ok) {
+                    const errorData = await driveResponse.json();
+                    console.error('Error creating file:', errorData);
+                    displayMessage(`Failed to create file: ${errorData.error.message || 'Unknown error'}`, 'error');
+                    return;
+                }
+
+                const fileResult = await driveResponse.json();
+                console.log('File Created Successfully:', fileResult);
+                displayMessage(`File '${fileResult.name}' created successfully with ID: ${fileResult.id}`, 'success');
+
+            } catch (error) {
+                console.error('Network or other error during file creation:', error);
+                displayMessage('A network error occurred while creating the file. Check console for details.', 'error');
+            }
+        }
+
+        async function handleAuthorizationCallback() {
+            spinnerElement.style.display = 'block';
+            const urlParams = new URLSearchParams(window.location.search);
+            const authCode = urlParams.get('code');
+            const error = urlParams.get('error');
+
+            if (error) {
+                console.error('OAuth Error:', error);
+                displayMessage(`Authorization failed: ${error}`, 'error');
+                return;
+            }
+
+            if (!authCode) {
+                console.warn('No authorization code found in URL.');
+                displayMessage('No authorization code received. Please try again.', 'error');
+                return;
+            }
+
+            console.log('Received Authorization Code:', authCode);
+            statusMessageElement.textContent = 'Authorization code received. Exchanging for access token...';
+
+            // Retrieve client ID and client Secret from localStorage
+            const clientId = localStorage.getItem('google_oauth_clientId');
+            const clientSecret = localStorage.getItem('google_oauth_clientSecret');
+            const callbackURL = 'https://marcelogiazzon.github.io/oauth_gmail/Gemini_Drive_OAuth_CallbackRequest.html'; // Must match registered redirect URI
+
+            if (!clientId || !clientSecret) {
+                displayMessage('Error: Client ID or Client Secret not found in localStorage. Please go back to authorizationRequest.html and enter them.', 'error');
+                console.error('Missing Google Client ID or Secret in localStorage.');
+                return;
+            }
+
+            // --- Attempt to exchange authorization code for access token ---
+            try {
+                const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        code: authCode,
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        redirect_uri: callbackURL,
+                        grant_type: 'authorization_code',
+                    }).toString(),
+                });
+
+                if (!tokenResponse.ok) {
+                    const errorData = await tokenResponse.json();
+                    console.error('Error exchanging code for token:', errorData);
+                    displayMessage(`Failed to get access token: ${errorData.error_description || errorData.error}`, 'error');
+                    return;
+                }
+
+                const tokenData = await tokenResponse.json();
+                console.log('Access Token Data:', tokenData);
+                const accessToken = tokenData.access_token;
+
+                // --- NEW STEP: Create Google Drive file ---
+                await createDriveFile(accessToken);
+
+            } catch (error) {
+                console.error('Network or other error during token exchange:', error);
+                displayMessage('A network error occurred during token exchange. Check console for details.', 'error');
+            }
+        }
+
+        // Call the main function when the script loads
+        handleAuthorizationCallback();
+    </script>
+</body>
+</html>
